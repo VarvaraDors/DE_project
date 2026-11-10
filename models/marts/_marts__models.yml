@@ -12,8 +12,19 @@ models:
         data_tests: [unique, not_null]
       - name: customer_id
         description: "Клиент, оформивший заказ."
+        data_tests:
+        - not_null
+        - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
       - name: order_date
         description: "Дата заказа."
+        data_tests:
+        - relationships:
+              arguments:
+                to: ref('dim_dates')
+                field: date_day
       - name: ordered_at
         description: "Время оформления заказа."
       - name: order_status
@@ -31,5 +42,104 @@ models:
       - name: first_paid_at
         description: "Время первой успешной оплаты; пусто, если оплат нет."
       - name: is_confirmed
-        description: "Подтверждённая покупка: статус paid и хотя бы одна успешная оплата."
+        description: "{{ doc('confirmed_order') }}"
         data_tests: [not_null]
+
+  - name: fct_order_items
+    description: >
+      Факт товаров в заказе: одна строка — один товар в заказе. Тестовые заказы исключены.
+      Внутри ключи на все измерения, меры и признак is_confirmed от заказа, к которому относится товар.
+    columns:
+      - name: order_item_id
+        description: "номер товара в заказе"
+        data_tests: [unique, not_null]
+      - name: product_id
+        description: "Идентификатор товара"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: order_id
+        description: "Идентификатор заказа."
+        data_tests: [not_null]
+      - name: order_date
+        description: "Дата заказа."
+        data_tests: 
+        - not_null
+        - relationships:
+              arguments:
+                to: ref('dim_dates')
+                field: date_day
+      - name: customer_id
+        description: "Клиент, оформивший заказ."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: quantity
+        description: "Количество товара в заказе"
+        data_tests: [non_negative]
+      - name: unit_price
+        description: "Цена товара"
+        data_tests: [non_negative]
+      - name: discount_amount
+        description: "Размер скидки"
+        data_tests: [non_negative]
+      - name: line_amount
+        description: "Выручка с товара с учётом скидок: quantity * unit_price - discount_amount"
+        data_tests: [non_negative]
+      - name: is_confirmed
+        description: "{{ doc('confirmed_order') }}"
+        data_tests: [not_null]
+
+  - name: dim_customers
+    description: "Измерение клиентов, включая не купивших никаких товаров. Содержит атрибуты клиента и его первую подтверждённую покупку."
+    columns:
+      - name: customer_id
+        description: "Идентификатор клиента."
+        data_tests: [unique, not_null]
+      - name: first_confirmed_order_id
+        description: "Номер первого подтверждённого заказа клиента"
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+
+  - name: dim_products
+    description: "Измерение товаров: название, бренд и иерархия - категория данного товара, родитель и корень"
+    columns:
+      - name: product_id
+        description: "Идентификатор товара."
+        data_tests: [unique, not_null]
+      - name: product_name
+        description: "Название товара."
+      - name: brand
+        description: "Бренд товара."
+      - name: category_name
+        description: "Категория данного."
+      - name: parent_category_name
+        description: "Категория-родитель."
+      - name: root_category_name
+        description: "Категория-корень."
+
+  - name: dim_dates
+    description: "Календарь, покрывающий все даты заказов: год, квартал, месяц, день недели, индикатор выходных."
+    columns:
+      - name: date_day
+        description: "День в дате."
+        data_tests: [unique, not_null]
+      - name: year
+        description: "Год."
+      - name: quarter
+        description: "Квартал."
+      - name: month
+        description: "Месяц."
+      - name: day_of_week
+        description: "День недели (от 1 до 7 с понедельника)."
+      - name: is_weekend
+        description: "Индикатор выходного дня."
